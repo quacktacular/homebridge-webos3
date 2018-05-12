@@ -22,6 +22,13 @@ function webos3Accessory(log, config, api) {
     if (this.volumeControl == undefined) {
         this.volumeControl = true;
     }
+    this.volumeButtonControl = config['volumeButtonControl'];
+    if (this.volumeButtonControl == true) {
+        this.log.info('ACTIVATE TEH UP AND DOWN BUTTONS');
+    }
+    if (this.volumeButtonControl == undefined) {
+        this.volumeButtonControl = false;
+    }
     this.pollingEnabled = config['pollingEnabled'];
     if (this.pollingEnabled == undefined) {
         this.pollingEnabled = false;
@@ -102,6 +109,8 @@ function webos3Accessory(log, config, api) {
     this.enabledServices.push(this.informationService);
 	
 	this.prepareVolumeService();
+	this.prepareVolumeUpService();
+	this.prepareVolumeDownService();
 	this.prepareAppSwitchService();
 
 }
@@ -127,6 +136,40 @@ webos3Accessory.prototype.prepareVolumeService = function () {
         .on('set', this.setVolume.bind(this));
 		
 	this.enabledServices.push(this.volumeService);
+	
+};
+
+webos3Accessory.prototype.prepareVolumeUpService = function () {
+	
+	if(!this.volumeButtonControl){
+		return;
+	}
+	
+    this.volumeUpService = new Service.Switch(this.name + " Volume Up", "volumeUpService");
+	
+    this.volumeUpService
+        .getCharacteristic(Characteristic.On)
+        .on('get', this.volumeButtonState.bind(this))
+        .on('set', this.volumeUp.bind(this));
+		
+	this.enabledServices.push(this.volumeUpService);
+	
+};
+
+webos3Accessory.prototype.prepareVolumeDownService = function () {
+	
+	if(!this.volumeButtonControl){
+		return;
+	}
+	
+    this.volumeDownService = new Service.Switch(this.name + " Volume Down", "volumeDownService");
+	
+    this.volumeDownService
+        .getCharacteristic(Characteristic.On)
+        .on('get', this.volumeButtonState.bind(this))
+        .on('set', this.volumeDown.bind(this));
+		
+	this.enabledServices.push(this.volumeDownService);
 	
 };
 
@@ -183,6 +226,20 @@ webos3Accessory.prototype.prepareAppSwitchService = function () {
 // HELPER METHODS
 webos3Accessory.prototype.setMuteStateManually = function (error, value) {
     if (this.volumeService) this.volumeService.getCharacteristic(Characteristic.On).updateValue(value);
+};
+
+webos3Accessory.prototype.setVolumeUpStateManually = function (error) {
+    if (this.volumeButtonControl) {
+      this.volumeUpService.getCharacteristic(Characteristic.On).updateValue(false);
+      this.log("Volume up button off");
+    }
+};
+
+webos3Accessory.prototype.setVolumeDownStateManually = function (error) {
+    if (this.volumeButtonControl) {
+      this.volumeDownService.getCharacteristic(Characteristic.On).updateValue(false);
+      this.log("Volume down button off");
+    }
 };
 
 webos3Accessory.prototype.setAppSwitchManually = function (error, value, appId) {
@@ -379,7 +436,33 @@ webos3Accessory.prototype.getVolume = function (callback) {
 webos3Accessory.prototype.setVolume = function (level, callback) {
     if (this.connected) {
         lgtv.request('ssap://audio/setVolume', {volume: level});
-        callback(null, level);
+        callback(null, true);
+    } else {
+        callback(new Error('webOS - is not connected'))
+    }
+};
+
+webos3Accessory.prototype.volumeButtonState = function (callback) {
+    callback(null, false);
+};
+
+webos3Accessory.prototype.volumeUp = function (state, callback) {
+    if (this.connected) {
+        lgtv.request('ssap://audio/volumeUp');
+        this.setVolumeUpStateManually();
+        this.log("Volume up");
+        callback(null);
+    } else {
+        callback(new Error('webOS - is not connected'))
+    }
+};
+
+webos3Accessory.prototype.volumeDown = function (state, callback) {
+    if (this.connected) {
+        lgtv.request('ssap://audio/volumeDown');
+        this.setVolumeDownStateManually();
+        this.log("Volume down");
+        callback(null);
     } else {
         callback(new Error('webOS - is not connected'))
     }
